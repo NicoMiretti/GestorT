@@ -9,12 +9,17 @@ type Archivo = {
   counts: Record<string, number>;
   estadoArchivo: string;
 };
+type Auxiliar = { path: string; estadoArchivo: string; notasArchivo: string };
 type Repo = {
   cloned: boolean;
   sourceDir: string;
   finalDir: string;
+  auxDir: string;
+  notesDir: string;
   archivos: Archivo[];
   finalFiles: string[];
+  auxiliares: Auxiliar[];
+  noteFiles: string[];
   git: { branch: string; ahead: number; behind: number; modified: string[]; not_added: string[]; staged: string[] };
 };
 
@@ -58,6 +63,25 @@ export default function Dashboard() {
       const j = await r.json();
       if (!r.ok) alert(j.error);
       else alert("Exportado a: " + j.path);
+    } finally { setBusy(null); }
+  }
+
+  async function crearDoc(kind: "aux" | "note") {
+    const name = prompt(kind === "aux"
+      ? "Nombre del documento auxiliar (ej: objetivos, metodologia)"
+      : "Nombre de la nota (ej: reunion-2026-04-23)");
+    if (!name) return;
+    setBusy("crear");
+    try {
+      const r = await fetch("/api/doc", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ kind, name }),
+      });
+      const j = await r.json();
+      if (!r.ok) { alert(j.error); return; }
+      const route = kind === "aux" ? "/doc/" : "/nota/";
+      window.location.href = route + encodeURIComponent(j.file);
     } finally { setBusy(null); }
   }
 
@@ -147,6 +171,56 @@ export default function Dashboard() {
               ))}
             </tbody>
           </table>
+        )}
+      </section>
+
+      <section className="card p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold">
+            Documentos auxiliares <span className="text-muted text-sm">({data.auxDir})</span>
+          </h2>
+          <button className="btn" disabled={!!busy} onClick={() => crearDoc("aux")}>+ Nuevo auxiliar</button>
+        </div>
+        {data.auxiliares.length === 0 ? (
+          <div className="text-muted text-sm">
+            Sin documentos auxiliares. Acá van objetivos, metodología, propuesta, planificación…
+          </div>
+        ) : (
+          <ul className="text-sm space-y-1">
+            {data.auxiliares.map((a) => (
+              <li key={a.path} className="flex items-center gap-3 border-b border-border py-1">
+                <Link href={`/doc/${encodeURIComponent(a.path)}`} className="text-accent hover:underline font-mono">
+                  {a.path.replace(data.auxDir + "/", "")}
+                </Link>
+                <span className="badge text-xs">{a.estadoArchivo}</span>
+                {a.notasArchivo && <span className="text-xs text-muted truncate">📝 {a.notasArchivo.slice(0, 60)}</span>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="card p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold">
+            Notas / Bitácora <span className="text-muted text-sm">({data.notesDir})</span>
+          </h2>
+          <button className="btn" disabled={!!busy} onClick={() => crearDoc("note")}>+ Nueva nota</button>
+        </div>
+        {data.noteFiles.length === 0 ? (
+          <div className="text-muted text-sm">
+            Sin notas. Útil para reuniones con el director, bitácora de decisiones, ideas sueltas…
+          </div>
+        ) : (
+          <ul className="text-sm space-y-1">
+            {data.noteFiles.map((f) => (
+              <li key={f} className="font-mono">
+                <Link href={`/nota/${encodeURIComponent(f)}`} className="text-accent hover:underline">
+                  {f.replace(data.notesDir + "/", "")}
+                </Link>
+              </li>
+            ))}
+          </ul>
         )}
       </section>
 
