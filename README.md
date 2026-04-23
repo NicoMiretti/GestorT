@@ -14,21 +14,37 @@ Construcción Real**: vos curás párrafo a párrafo, decidís qué entra al man
 
 ## Setup
 
+### Opción A — Docker (recomendado, portable)
+
+Un solo comando, en cualquier máquina con Docker:
+
 ```powershell
-# 1. Instalar dependencias
-npm install
-
-# 2. Configurar entorno
-copy .env.example .env.local
-# Editá .env.local: GITHUB_PAT, GIT_AUTHOR_NAME, GIT_AUTHOR_EMAIL
-
-# 3. Levantar
-npm run dev
+copy .env.example .env.local   # editá GITHUB_PAT y tu email
+docker compose up -d --build
 # → http://localhost:3030
 ```
 
-Al primer acceso clona el repo a `data/repo/`. Después usás los botones **Pull / Push**
-del dashboard.
+Para ver logs / parar / reiniciar:
+
+```powershell
+docker compose logs -f
+docker compose down            # para
+docker compose up -d            # vuelve a levantar (datos preservados)
+docker compose down -v          # para Y borra el volumen (resetea estado)
+```
+
+**Persistencia:** todo lo que vive en `/app/data` (clone del repo de tesis +
+`estado.json`) se guarda en un volumen Docker llamado `gestort_gestort-data`.
+Sobrevive reinicios y rebuilds. El contenedor incluye `git` y `pandoc`
+preinstalados, así que el export funciona out-of-the-box.
+
+### Opción B — Local (sin Docker)
+
+```powershell
+npm install
+copy .env.example .env.local   # editá GITHUB_PAT y tu email
+npm run dev                     # http://localhost:3030
+```
 
 ## Flujo de trabajo
 
@@ -58,8 +74,12 @@ del dashboard.
 
 ## Requisitos opcionales
 
-- **pandoc** para export → https://pandoc.org/installing.html
-- Para `.pdf` con pandoc: LaTeX (MiKTeX o TinyTeX en Windows)
+- **Docker Desktop** (modo recomendado): https://www.docker.com/products/docker-desktop
+- Si corrés local sin Docker:
+  - Node.js 20+
+  - Git en el PATH
+  - **pandoc** para export → https://pandoc.org/installing.html
+  - Para `.pdf` con pandoc: LaTeX (MiKTeX o TinyTeX en Windows)
 
 ## Estructura
 

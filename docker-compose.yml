@@ -1,0 +1,15 @@
+services:
+  gestort:
+    build: .
+    image: gestort:latest
+    container_name: gestort
+    ports:
+      - "3030:3030"
+    env_file:
+      - .env.local
+    volumes:
+      - gestort-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  gestort-data:
