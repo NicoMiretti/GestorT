@@ -52,13 +52,13 @@ export default function Dashboard() {
     } finally { setBusy(null); }
   }
 
-  async function exportar(format: string) {
+  async function exportar(format: string, source: string = "final") {
     setBusy("export");
     try {
       const r = await fetch("/api/export", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ format }),
+        body: JSON.stringify({ format, source }),
       });
       const j = await r.json();
       if (!r.ok) alert(j.error);
@@ -123,10 +123,14 @@ export default function Dashboard() {
       <section className="card p-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold">Capítulos / Secciones <span className="text-muted text-sm">({data.sourceDir})</span></h2>
-          <div className="flex gap-2">
-            <button className="btn" disabled={!!busy} onClick={() => exportar("docx")}>Export .docx</button>
-            <button className="btn" disabled={!!busy} onClick={() => exportar("pdf")}>Export .pdf</button>
-            <button className="btn" disabled={!!busy} onClick={() => exportar("tex")}>Export .tex</button>
+          <div className="flex flex-wrap gap-2">
+            <span className="text-xs text-muted self-center">Manuscrito final:</span>
+            <button className="btn btn-ok" disabled={!!busy} onClick={() => exportar("pdf", "final")}>PDF APA ✓</button>
+            <button className="btn" disabled={!!busy} onClick={() => exportar("docx", "final")}>.docx</button>
+            <button className="btn" disabled={!!busy} onClick={() => exportar("tex", "final")}>.tex</button>
+            <span className="text-xs text-muted self-center ml-2">Borradores:</span>
+            <button className="btn btn-warn" disabled={!!busy} onClick={() => exportar("pdf", "capitulos")}>PDF borrador</button>
+            <button className="btn" disabled={!!busy} onClick={() => exportar("docx", "capitulos")}>.docx borr.</button>
           </div>
         </div>
         {data.archivos.length === 0 ? (
@@ -138,11 +142,13 @@ export default function Dashboard() {
                 <th className="py-2">Archivo</th>
                 <th>Párrafos</th>
                 <th>Progreso</th>
-                <th>Pendiente</th>
+                <th title="Nuevos generados por OpenCode (sin tocar)">🆕 Nuevo</th>
+                <th title="Modificados por OpenCode tras tu trabajo previo">⚠ Modif.</th>
                 <th>En redacción</th>
                 <th>Validado</th>
                 <th>Discutir</th>
                 <th>Bibliografía</th>
+                <th title="Archivados por reconciliación (texto desapareció)">📦 Arch.</th>
               </tr>
             </thead>
             <tbody>
@@ -162,11 +168,13 @@ export default function Dashboard() {
                       <span className="text-xs text-muted">{a.progreso}%</span>
                     </div>
                   </td>
-                  <td>{a.counts.pendiente || 0}</td>
+                  <td className="text-accent">{a.counts.borrador_nuevo || 0}</td>
+                  <td className="text-warn">{a.counts.borrador_modificado || 0}</td>
                   <td>{a.counts.en_redaccion || 0}</td>
                   <td className="text-ok">{a.counts.validado || 0}</td>
                   <td className="text-danger">{a.counts.discutir_director || 0}</td>
                   <td className="text-[#bb9af7]">{a.counts.revisar_bibliografia || 0}</td>
+                  <td className="text-muted">{a.counts.archivados || 0}</td>
                 </tr>
               ))}
             </tbody>

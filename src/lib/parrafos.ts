@@ -17,10 +17,10 @@ function normalize(s: string): string {
   return s.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
-function hashFor(text: string, idx: number): string {
-  // Hash del contenido + posición → estable mientras no edites el párrafo
+function hashFor(text: string): string {
+  // Hash SOLO del contenido (sin posición) → estable aunque OpenCode inserte/reordene párrafos
   const h = crypto.createHash("sha1");
-  h.update(`${idx}::${normalize(text)}`);
+  h.update(normalize(text));
   return h.digest("hex").slice(0, 12);
 }
 
@@ -76,11 +76,18 @@ export function splitParrafos(md: string): Parrafo[] {
   }
   flush();
 
+  // Deduplicar hashes (caso raro: 2 párrafos idénticos)
+  const seen = new Map<string, number>();
+
   return blocks.map((raw, index) => {
     const text = stripMd(raw);
     const flags = Array.from(raw.matchAll(FLAG_RE)).map((m) => m[1]);
+    const baseHash = hashFor(raw);
+    const count = (seen.get(baseHash) || 0) + 1;
+    seen.set(baseHash, count);
+    const id = count > 1 ? `${baseHash}-${count}` : baseHash;
     return {
-      id: hashFor(raw, index),
+      id,
       index,
       type: classify(raw),
       level: classify(raw) === "heading" ? raw.match(/^#+/)?.[0].length : undefined,

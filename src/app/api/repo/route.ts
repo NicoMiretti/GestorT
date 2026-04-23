@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { ensureCloned, listMd, status } from "@/lib/git";
-import { loadEstado, statsForFile } from "@/lib/estado";
+import { ensureCloned, listMd, status, readRepoFile } from "@/lib/git";
+import { loadEstado, statsForFile, reconcileFile } from "@/lib/estado";
+import { splitParrafos } from "@/lib/parrafos";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,13 @@ export async function GET() {
     const finalFiles = await listMd(finalDir);
     const auxFiles = await listMd(auxDir);
     const noteFiles = await listMd(notesDir);
+
+    // Reconciliar TODOS los capítulos (detectar nuevos/modificados desde último pull)
+    for (const f of sourceFiles) {
+      const md = await readRepoFile(f);
+      await reconcileFile(f, splitParrafos(md));
+    }
+
     const estado = await loadEstado();
     const st = await status();
 

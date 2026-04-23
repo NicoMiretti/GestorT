@@ -20,8 +20,9 @@ type FileData = {
   finalMd: string;
   sourceParrafos: Parrafo[];
   finalParrafos: Parrafo[];
-  meta: { parrafos: Record<string, { estado: string; notas: string; finalText?: string; updatedAt: string }>; estadoArchivo?: string; notasArchivo?: string };
+  meta: { parrafos: Record<string, { estado: string; notas: string; finalText?: string; updatedAt: string }>; estadoArchivo?: string; notasArchivo?: string; archivados?: any[] };
   history: { hash: string; date: string; message: string; author_name: string }[];
+  reconciliacion?: { nuevos: number; archivados: number; total: number };
 };
 
 export default function CapituloPage({ params }: { params: { slug: string } }) {
@@ -169,24 +170,56 @@ export default function CapituloPage({ params }: { params: { slug: string } }) {
         </div>
       )}
 
+      {/* Banner de reconciliación: avisa qué pasó al cargar */}
+      {data.reconciliacion && (data.reconciliacion.nuevos > 0 || data.reconciliacion.archivados > 0) && (
+        <div className="card p-3 border-accent/40 bg-accent/10">
+          <div className="text-sm">
+            <strong className="text-accent">Cambios detectados desde tu último Pull:</strong>{" "}
+            {data.reconciliacion.nuevos > 0 && (
+              <span className="text-accent">🆕 {data.reconciliacion.nuevos} párrafo(s) nuevo(s) de OpenCode. </span>
+            )}
+            {data.reconciliacion.archivados > 0 && (
+              <span className="text-warn">📦 {data.reconciliacion.archivados} párrafo(s) que tenían trabajo fueron archivados (su texto en OpenCode cambió o desaparecieron). </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Leyenda de botones */}
+      <div className="card p-3 text-xs text-muted">
+        <strong className="text-text">Cómo funciona:</strong>{" "}
+        Cada párrafo tiene 3 columnas: <span className="text-accent">Andamio</span> (lo que generó OpenCode, read-only) ·
+        <span className="text-warn"> Construcción</span> (tu redacción curada, editable) ·
+        <span className="text-ok"> Notas + Estado</span> (metadata privada).
+        <br />
+        <strong className="text-text">Botones:</strong>{" "}
+        <span className="kbd">✓ Aceptar tal cual</span> copia el andamio a tu redacción y marca <em>validado</em> ·
+        <span className="kbd">Guardar borrador</span> guarda cambios sin validar (estado <em>en redacción</em>) ·
+        <span className="kbd">✓ Validar</span> guarda y marca como validado ·
+        <span className="kbd">💾 Escribir manuscrito final</span> vuelca todo lo curado al archivo en <code>{data.finalPath}</code>.
+        <br />
+        <strong className="text-text">Persistencia:</strong> el estado se guarda en <code>.gestort/estado.json</code> dentro del repo de tesis → <strong>se sincroniza entre PCs vía Pull/Push</strong>.
+      </div>
+
       <div className="grid grid-cols-12 gap-3">
         {/* Header de columnas */}
-        <div className="col-span-4 text-xs uppercase tracking-wide text-muted px-1">Andamio (OpenCode)</div>
-        <div className="col-span-5 text-xs uppercase tracking-wide text-muted px-1">Construcción real (Tu redacción)</div>
-        <div className="col-span-3 text-xs uppercase tracking-wide text-muted px-1">Notas privadas + Estado</div>
+        <div className="col-span-4 text-xs uppercase tracking-wide text-muted px-1">Andamio (OpenCode) — read only</div>
+        <div className="col-span-5 text-xs uppercase tracking-wide text-muted px-1">Construcción real — tu redacción</div>
+        <div className="col-span-3 text-xs uppercase tracking-wide text-muted px-1">Estado + Notas privadas</div>
 
         {data.sourceParrafos.map((p) => {
           const meta = data.meta?.parrafos?.[p.id];
-          const estado = meta?.estado || "pendiente";
+          const estado = meta?.estado || "borrador_nuevo";
           const estadoCfg = ESTADOS.find((e) => e.id === estado)!;
           const draft = drafts[p.id] ?? p.raw;
           const changed = draft !== (meta?.finalText ?? p.raw) || (notes[p.id] ?? "") !== (meta?.notas ?? "");
+          const isValidated = estado === "validado" || estado === "cerrado";
 
           return (
             <div key={p.id} className="col-span-12 grid grid-cols-12 gap-3 group" id={`p-${p.id}`}>
               {/* Andamio */}
-              <div className="col-span-4 card p-3 text-sm">
-                <div className="flex items-center gap-2 mb-2">
+              <div className="col-span-4 card p-3 text-sm" style={{ borderLeft: `3px solid ${estadoCfg.color}` }}>
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
                   <span className="kbd">{p.type}{p.level ? `·h${p.level}` : ""}</span>
                   <span className="text-xs text-muted">#{p.index} · {p.wordCount} palabras</span>
                   {p.flags.map((f) => (
@@ -195,7 +228,14 @@ export default function CapituloPage({ params }: { params: { slug: string } }) {
                 </div>
                 <pre className="whitespace-pre-wrap font-mono text-[13px] leading-relaxed text-muted">{p.raw}</pre>
                 <div className="mt-2 flex gap-2">
-                  <button className="btn btn-ok !py-0.5" disabled={busy === p.id} onClick={() => aceptarTalCual(p)}>✓ Aceptar tal cual</button>
+                  <button
+                    className="btn btn-ok !py-0.5"
+                    disabled={busy === p.id || isValidated}
+                    title="Copia este andamio a tu redacción y lo marca como validado"
+                    onClick={() => aceptarTalCual(p)}
+                  >
+                    {isValidated ? "✓ Ya validado" : "✓ Aceptar tal cual"}
+                  </button>
                 </div>
               </div>
 
@@ -208,10 +248,22 @@ export default function CapituloPage({ params }: { params: { slug: string } }) {
                   onChange={(e) => setDrafts((d) => ({ ...d, [p.id]: e.target.value }))}
                 />
                 <div className="mt-2 flex flex-wrap gap-2 items-center">
-                  <button className="btn !py-0.5" disabled={busy === p.id || !changed} onClick={() => saveParrafo(p.id)}>
-                    {busy === p.id ? "Guardando…" : "Guardar borrador"}
+                  <button
+                    className="btn !py-0.5"
+                    disabled={busy === p.id || !changed}
+                    title={changed ? "Guarda cambios y marca como 'en redacción'" : "Sin cambios para guardar"}
+                    onClick={() => saveParrafo(p.id)}
+                  >
+                    {busy === p.id ? "Guardando…" : changed ? "💾 Guardar (en redacción)" : "💾 Sin cambios"}
                   </button>
-                  <button className="btn btn-ok !py-0.5" disabled={busy === p.id} onClick={() => validar(p.id)}>✓ Validar</button>
+                  <button
+                    className="btn btn-ok !py-0.5"
+                    disabled={busy === p.id}
+                    title="Guarda y marca como validado (lista para el manuscrito final)"
+                    onClick={() => validar(p.id)}
+                  >
+                    ✓ Validar
+                  </button>
                   <span className="text-xs text-muted ml-auto">
                     {draft.trim() ? draft.trim().split(/\s+/).length : 0} palabras
                   </span>

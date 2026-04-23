@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readRepoFile, writeRepoFile, fileExists, log } from "@/lib/git";
 import { splitParrafos } from "@/lib/parrafos";
-import { getFileMeta } from "@/lib/estado";
+import { getFileMeta, reconcileFile } from "@/lib/estado";
 import path from "node:path";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +14,9 @@ export async function GET(req: NextRequest) {
 
     const sourceMd = (await fileExists(file)) ? await readRepoFile(file) : "";
     const sourceParrafos = splitParrafos(sourceMd);
+
+    // Reconciliar: auto-crea estado para nuevos, archiva los que desaparecieron
+    const reconciliacion = await reconcileFile(file, sourceParrafos);
 
     // Archivo final equivalente
     const sourceDir = process.env.SOURCE_DIR || "tesis/capitulos";
@@ -35,6 +38,7 @@ export async function GET(req: NextRequest) {
       finalParrafos,
       meta,
       history,
+      reconciliacion,
     });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });
